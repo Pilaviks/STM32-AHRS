@@ -9,38 +9,6 @@ Miniature Attitude and Heading Reference System (AHRS) on STM32F411CEU6 (Black P
 - Drive a physical actuator (servo) from PID output derived from IMU data
 - Learn embedded systems development end-to-end: toolchain, clocks, peripherals, interrupts, debugging
 
-## Challenges and Solutions
-
-**1. ST-Link clone — no USB-UART bridge**
-No serial monitor available at any point. All verification done exclusively through STM32CubeIDE Live Expressions debugger. Required careful choice of which variables to expose globally and watch in real time.
-
-**2. HAL I2C inside ISR — MCU crash**
-Early architecture put MPU-6050 reads inside the TIM2 interrupt callback. This caused a hard fault: HAL I2C uses SysTick-based timeouts, and SysTick cannot run inside a higher-priority ISR. Solution: ISR only sets `sample_flag = 1`. All I2C work happens in the main loop consuming that flag.
-
-**3. MPU-6050 power-up timing**
-WHO_AM_I register returned 0x00 on first attempts. Root cause: I2C read issued before sensor finished booting. Fixed with `HAL_Delay(100)` before the first register access.
-
-**4. Floating EXTI pin — MCU crash**
-HC-SR04 ECHO pin (PA9) configured with EXTI but sensor not connected. Floating input caused spurious interrupts and MCU lockup. Solution: do not enable EXTI on unconnected pins under any circumstances.
-
-**5. HC-SR04 sensor failure**
-Sensor did not respond despite correct wiring and code. Skipped after diagnosis — hardware fault confirmed. Code retained in codebase for completeness.
-
-**6. TIM1 PWM silent — CCR1 stuck at 0**
-SG90 servo not moving despite correct PID output. Root cause: TIM1 RCC clock not explicitly enabled before `HAL_TIM_PWM_Init`. Added `__HAL_RCC_TIM1_CLK_ENABLE()` at the top of `MX_TIM1_Init`. CCR1 immediately showed correct values after fix.
-
-**7. TIM1 advanced timer — MOE bit**
-TIM1 is an advanced-control timer. Unlike general-purpose timers, it requires the Main Output Enable (MOE) bit set or PWM output stays electrically silent. Fixed by calling `HAL_TIMEx_ConfigBreakDeadTime` with `AutomaticOutput = TIM_AUTOMATICOUTPUT_ENABLE`.
-
-**8. PID clamp sign bug**
-`pid_output` was stuck at +90° regardless of `sim_pitch`. Root cause: negative output clamp written as `if (output < -PID_OUT_MIN)` — since `PID_OUT_MIN = -90.0f`, this evaluated to `if (output < +90.0f)`, clamping everything to +90. Fixed to `if (output < PID_OUT_MIN)`.
-
-**9. Loose GND — servo not moving**
-CCR1 showed correct changing values, PWM signal confirmed present, but servo did not move. Root cause: loose GND wire on breadboard — servo brown wire not making reliable contact. Physical reseating fixed it immediately.
-
-**10. PA8 pin repurposed**
-PA8 originally allocated as HC-SR04 TRIG output. After HC-SR04 was skipped, PA8 was repurposed as TIM1_CH1 PWM output for the servo. GPIO reconfigured from `GPIO_MODE_OUTPUT_PP` to `GPIO_MODE_AF_PP` with `GPIO_AF1_TIM1`.
-
 ## Hardware
 
 | Component | Details |
@@ -102,3 +70,35 @@ All values verified via STM32CubeIDE Live Expressions (no USB-UART adapter avail
 - `htim1.Instance->CCR1` — live PWM pulse width (1000–2000μs)
 - `system_state` — state machine position
 - `system_tick_ms` — elapsed time confirmation
+
+## Challenges and Solutions
+
+**1. ST-Link clone — no USB-UART bridge**
+No serial monitor available at any point. All verification done exclusively through STM32CubeIDE Live Expressions debugger. Required careful choice of which variables to expose globally and watch in real time.
+
+**2. HAL I2C inside ISR — MCU crash**
+Early architecture put MPU-6050 reads inside the TIM2 interrupt callback. This caused a hard fault: HAL I2C uses SysTick-based timeouts, and SysTick cannot run inside a higher-priority ISR. Solution: ISR only sets `sample_flag = 1`. All I2C work happens in the main loop consuming that flag.
+
+**3. MPU-6050 power-up timing**
+WHO_AM_I register returned 0x00 on first attempts. Root cause: I2C read issued before sensor finished booting. Fixed with `HAL_Delay(100)` before the first register access.
+
+**4. Floating EXTI pin — MCU crash**
+HC-SR04 ECHO pin (PA9) configured with EXTI but sensor not connected. Floating input caused spurious interrupts and MCU lockup. Solution: do not enable EXTI on unconnected pins under any circumstances.
+
+**5. HC-SR04 sensor failure**
+Sensor did not respond despite correct wiring and code. Skipped after diagnosis — hardware fault confirmed. Code retained in codebase for completeness.
+
+**6. TIM1 PWM silent — CCR1 stuck at 0**
+SG90 servo not moving despite correct PID output. Root cause: TIM1 RCC clock not explicitly enabled before `HAL_TIM_PWM_Init`. Added `__HAL_RCC_TIM1_CLK_ENABLE()` at the top of `MX_TIM1_Init`. CCR1 immediately showed correct values after fix.
+
+**7. TIM1 advanced timer — MOE bit**
+TIM1 is an advanced-control timer. Unlike general-purpose timers, it requires the Main Output Enable (MOE) bit set or PWM output stays electrically silent. Fixed by calling `HAL_TIMEx_ConfigBreakDeadTime` with `AutomaticOutput = TIM_AUTOMATICOUTPUT_ENABLE`.
+
+**8. PID clamp sign bug**
+`pid_output` was stuck at +90° regardless of `sim_pitch`. Root cause: negative output clamp written as `if (output < -PID_OUT_MIN)` — since `PID_OUT_MIN = -90.0f`, this evaluated to `if (output < +90.0f)`, clamping everything to +90. Fixed to `if (output < PID_OUT_MIN)`.
+
+**9. Loose GND — servo not moving**
+CCR1 showed correct changing values, PWM signal confirmed present, but servo did not move. Root cause: loose GND wire on breadboard — servo brown wire not making reliable contact. Physical reseating fixed it immediately.
+
+**10. PA8 pin repurposed**
+PA8 originally allocated as HC-SR04 TRIG output. After HC-SR04 was skipped, PA8 was repurposed as TIM1_CH1 PWM output for the servo. GPIO reconfigured from `GPIO_MODE_OUTPUT_PP` to `GPIO_MODE_AF_PP` with `GPIO_AF1_TIM1`.
