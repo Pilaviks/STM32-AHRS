@@ -18,6 +18,14 @@ Miniature Attitude and Heading Reference System (AHRS) on STM32F411CEU6 (Black P
 | Servo | Tower Pro SG90 (PWM, PA8) |
 | Debugger | ST-Link V2 (SWD) |
 
+
+## Hardware Skills
+
+- Soldered header pins to STM32F411 Black Pill and MPU-6050 breakout board
+- Diagnosed intermittent breadboard connections by removing female dupont connector housings, tightening the internal metal crimps, and reinserting — restores reliable contact without replacing cables
+- Learned to distinguish hardware faults from software faults through systematic elimination (confirmed HC-SR04 as hardware dead, not code issue)
+- Debugged floating pins, loose GND wires, and power issues purely through behavioral symptoms and Live Expressions — no oscilloscope or logic analyzer available
+
 ## Features
 
 - **Interrupt-driven architecture** — TIM2 fires every 100ms, sets `sample_flag`; all I2C work in main loop
